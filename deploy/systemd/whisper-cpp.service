@@ -1,0 +1,29 @@
+[Unit]
+Description=whisper.cpp inference server
+After=network.target
+
+[Service]
+Type=simple
+User=whisper
+Group=whisper
+WorkingDirectory=/opt/whisper
+EnvironmentFile=/opt/whisper/.env
+# Počúva iba na localhoste – von je vystavené len whisper-api
+ExecStart=/opt/whisper/whisper.cpp/build/bin/whisper-server \
+    --model ${WHISPER_MODEL} \
+    --host 127.0.0.1 \
+    --port ${WHISPER_PORT} \
+    --threads ${WHISPER_THREADS}
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadOnlyPaths=/opt/whisper
+
+[Install]
+WantedBy=multi-user.target

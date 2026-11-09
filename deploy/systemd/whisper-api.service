@@ -1,0 +1,30 @@
+[Unit]
+Description=Whisper OpenAI-compatible API (FastAPI)
+After=network.target whisper-cpp.service
+Wants=whisper-cpp.service
+
+[Service]
+Type=simple
+User=whisper
+Group=whisper
+WorkingDirectory=/opt/whisper
+EnvironmentFile=/opt/whisper/.env
+# whisper.cpp spracúva requesty sériovo, viac workerov preto nepomôže
+ExecStart=/opt/whisper/app/.venv/bin/uvicorn app.main:app \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --workers 1 \
+    --proxy-headers
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadOnlyPaths=/opt/whisper
+
+[Install]
+WantedBy=multi-user.target
