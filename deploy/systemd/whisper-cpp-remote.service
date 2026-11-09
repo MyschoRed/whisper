@@ -1,0 +1,44 @@
+[Unit]
+Description=whisper.cpp inference server (vzdialený backend pre whisper-api, GPU)
+After=network-online.target
+Wants=network-online.target
+# Naštartuj pred llama-serverom: ten má "fit = on" a prispôsobí sa voľnej VRAM.
+Before=llama-server.service
+
+# Variant pre výkonnejší stroj (10.0.10.92): whisper-server počúva v LAN a whisper-api
+# na 10.0.10.13 naň posiela audio (WHISPER_URL=http://10.0.10.92:8083).
+# Prístup povolený iba z API servera – systemd filter (eBPF), bez zásahu do firewallu.
+#
+# Beží na GPU1 (~1 GB VRAM), build s -DGGML_CUDA=ON do build-cuda/.
+# Návrat na CPU: ExecStart na build/bin/whisper-server a --threads 12.
+
+[Service]
+Type=simple
+User=whisper
+Group=whisper
+WorkingDirectory=/opt/whisper
+Environment=CUDA_VISIBLE_DEVICES=1
+ExecStart=/opt/whisper/whisper.cpp/build-cuda/bin/whisper-server \
+    --model /opt/whisper/models/ggml-large-v3-turbo-q5_0.bin \
+    --host 10.0.10.92 \
+    --port 8083 \
+    --threads 4
+Restart=on-failure
+RestartSec=5
+
+IPAddressAllow=10.0.10.13 127.0.0.0/8
+IPAddressDeny=any
+
+Nice=10
+CPUWeight=50
+MemoryMax=4G
+
+# Hardening (PrivateDevices nie – potrebuje /dev/nvidia*)
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/opt/whisper
+
+[Install]
+WantedBy=multi-user.target

@@ -97,6 +97,25 @@ uv run uvicorn app.main:app --reload
 - API aj whisper-server počúvajú iba na `127.0.0.1`; zvonku sú dostupné len cez nginx (`deploy/nginx/mh.azeta.sk.conf`).
 - Služby majú nízku prioritu CPU (`Nice`, `CPUWeight`) a strop RAM (`MemoryMax`), aby nespomalili ostatné aplikácie na serveri.
 
+## Vzdialený backend (výkonnejší stroj)
+
+whisper-server môže bežať na inom stroji v LAN. API, kľúče a nginx ostávajú na pôvodnom serveri, mení sa iba `WHISPER_URL`.
+
+```
+10.0.10.13  nginx + whisper-api  ──LAN──▶  10.0.10.92:8083  whisper-server (GPU1, RTX 5060 Ti)
+```
+
+Na GPU trvá krátka poznámka ~0,2 s a 61 s nahrávka ~0,7 s (na CPU stroja 4 s / 13 s, na pôvodnom serveri 30 s / 98 s), takže `audio_ctx` zrýchlenie netreba (`SHORT_AUDIO_CTX=0`). Whisper zaberá ~1 GB VRAM na GPU1; GPU zdieľa s `llama-server`, ktorý má `fit = on` a štartuje až po whisperi.
+
+Inštalácia na backend: zostaviť whisper.cpp s CUDA (`cmake -B build-cuda -DGGML_NATIVE=ON -DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=120`), stiahnuť model do `/opt/whisper/models` a nasadiť `deploy/systemd/whisper-cpp-remote.service` ako `whisper-cpp.service`. Služba prijíma spojenia iba z `10.0.10.13` (`IPAddressAllow`), firewall stroja sa nemení. CPU build (`build/`) ostáva ako záloha.
+
+Na API serveri v `/opt/whisper/.env`:
+
+```
+WHISPER_URL=http://10.0.10.92:8083
+SHORT_AUDIO_CTX=0
+```
+
 ## Nginx a bezpečnosť
 
 `deploy/nginx/mh.azeta.sk.conf` pridáva nový `server` blok iba pre `mh.azeta.sk`. Ostatné stránky sa nemenia.
