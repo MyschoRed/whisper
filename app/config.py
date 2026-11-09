@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     request_timeout: float = 1800.0
     ffmpeg_bin: str = "ffmpeg"
     log_level: str = "info"
+    # None = automaticky: vypnuté pre "turbo" modely, ktoré preklad nepodporujú
+    translations_enabled: bool | None = None
 
     @field_validator("api_keys", mode="before")
     @classmethod
@@ -23,6 +25,19 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [k.strip() for k in value.split(",") if k.strip()]
         return value
+
+    @field_validator("translations_enabled", mode="before")
+    @classmethod
+    def empty_is_auto(cls, value: object) -> object:
+        if isinstance(value, str) and value.strip().lower() in ("", "auto"):
+            return None
+        return value
+
+    @property
+    def translations_supported(self) -> bool:
+        if self.translations_enabled is not None:
+            return self.translations_enabled
+        return "turbo" not in self.model_name.lower()
 
     @property
     def max_upload_bytes(self) -> int:

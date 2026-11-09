@@ -18,7 +18,7 @@ whisper-server   whisper.cpp, 127.0.0.1:8081  (whisper-cpp.service)
 | Metóda | Cesta                       | Popis                                         |
 |--------|-----------------------------|-----------------------------------------------|
 | POST   | `/v1/audio/transcriptions`  | prepis (`file`, `language`, `prompt`, `response_format`, `temperature`) |
-| POST   | `/v1/audio/translations`    | preklad do angličtiny                         |
+| POST   | `/v1/audio/translations`    | preklad do angličtiny (nie s modelmi „turbo“, pozri nižšie) |
 | GET    | `/v1/models`                | zoznam modelov                                |
 | GET    | `/health`                   | stav API aj whisper.cpp (bez autentifikácie)  |
 
@@ -89,6 +89,8 @@ uv run uvicorn app.main:app --reload
 
 ## Poznámky
 
+- **Preklad a modely „turbo“:** `large-v3-turbo` nebol trénovaný na preklad, preto je `/v1/audio/translations` pri ňom predvolene vypnutý a vracia `400` s vysvetlením. Ak preklad potrebuješ, nasaď napr. `large-v3` (`MODEL=large-v3-q5_0`, `MODEL_NAME=whisper-large-v3`) alebo nastav `TRANSLATIONS_ENABLED=true`.
+- Text v odpovediach `json`, `verbose_json` a `text` je orezaný a spojený do jedného riadku ako pri OpenAI. Formáty `srt` a `vtt` ostávajú nezmenené.
 - whisper.cpp spracúva requesty **sériovo**: súbežné requesty čakajú vo fronte.
 - Na CPU trvá prepis dlhej nahrávky aj niekoľko minút; limit nastavíš cez `REQUEST_TIMEOUT`. Ak je pred serverom reverse proxy, zvýš timeout aj tam.
 - Port 8000 je vystavený na všetkých rozhraniach. Ak k serveru nepristupuješ iba z dôveryhodnej siete, daj pred neho reverse proxy s TLS (napr. Caddy alebo nginx).

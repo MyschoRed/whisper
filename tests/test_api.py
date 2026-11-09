@@ -1,5 +1,6 @@
 """Testy API bez skutočného whisper.cpp a ffmpeg (obe sú nahradené mockom)."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -24,9 +25,13 @@ class FakeWhisper:
 
     async def inference(self, wav: Path, **kwargs) -> InferenceResult:
         self.calls.append(kwargs)
-        if kwargs["response_format"] in ("json", "verbose_json"):
-            return InferenceResult(b'{"text": "Ahoj svet."}', "application/json")
-        return InferenceResult(b"Ahoj svet.", "text/plain")
+        # whisper.cpp vracia úvodnú medzeru a zalomenia medzi segmentmi
+        if kwargs["response_format"] == "verbose_json":
+            body = {"text": " Ahoj\n svet.\n", "segments": [{"id": 0, "text": " Ahoj\n"}]}
+            return InferenceResult(json.dumps(body).encode(), "application/json")
+        if kwargs["response_format"] == "json":
+            return InferenceResult(b'{"text": " Ahoj\\n svet.\\n"}', "application/json")
+        return InferenceResult(b" Ahoj\n svet.\n", "text/plain")
 
     async def close(self) -> None:
         pass
@@ -47,13 +52,16 @@ def fake_whisper(monkeypatch: pytest.MonkeyPatch) -> FakeWhisper:
     return fake
 
 
+def _make_client(**overrides):
+    app = create_app()
+    settings = Settings(api_keys=[API_KEY], max_upload_mb=1, _env_file=None, **overrides)
+    app.dependency_overrides[get_settings] = lambda: settings
+    return TestClient(app)
+
+
 @pytest.fixture
 def client(fake_whisper: FakeWhisper):
-    app = create_app()
-    app.dependency_overrides[get_settings] = lambda: Settings(
-        api_keys=[API_KEY], max_upload_mb=1, _env_file=None
-    )
-    with TestClient(app) as c:
+    with _make_client() as c:
         yield c
 
 
@@ -90,8 +98,25 @@ def test_transcription_text_format(client: TestClient) -> None:
     assert resp.headers["content-type"].startswith("text/plain")
 
 
-def test_translation_uses_translate(client: TestClient, fake_whisper: FakeWhisper) -> None:
+def test_verbose_json_segments_cleaned(client: TestClient) -> None:
+    resp = client.post("/v1/audio/transcriptions", files=_audio(),
+                       data={"response_format": "verbose_json"}, headers=AUTH)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["text"] == "Ahoj svet."
+    assert body["segments"][0]["text"] == "Ahoj"
+
+
+def test_translation_disabled_for_turbo(client: TestClient, fake_whisper: FakeWhisper) -> None:
     resp = client.post("/v1/audio/translations", files=_audio(), headers=AUTH)
+    assert resp.status_code == 400
+    assert "turbo" in resp.json()["error"]["message"]
+    assert fake_whisper.calls == []
+
+
+def test_translation_uses_translate(fake_whisper: FakeWhisper) -> None:
+    with _make_client(model_name="whisper-large-v3") as client:
+        resp = client.post("/v1/audio/translations", files=_audio(), headers=AUTH)
     assert resp.status_code == 200
     assert fake_whisper.calls[0]["translate"] is True
     assert fake_whisper.calls[0]["language"] == "auto"

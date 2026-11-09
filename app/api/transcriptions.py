@@ -14,6 +14,7 @@ from app.config import Settings, get_settings
 from app.errors import api_error
 from app.schemas import MEDIA_TYPES, ResponseFormat
 from app.services.audio import save_upload, to_wav16k, workdir
+from app.services.text import normalize
 from app.services.whisper_client import WhisperClient
 
 log = logging.getLogger(__name__)
@@ -54,6 +55,14 @@ async def create_translation(
     temperature: Annotated[float, Form(ge=0.0, le=1.0)] = 0.0,
 ) -> Response:
     """Preklad do angličtiny (ako OpenAI); jazyk zdroja sa detekuje automaticky."""
+    if not settings.translations_supported:
+        raise api_error(
+            status.HTTP_400_BAD_REQUEST,
+            f"Model '{settings.model_name}' nepodporuje preklad (modely 'turbo' neboli "
+            "trénované na preklad). Použi /v1/audio/transcriptions alebo nasaď model "
+            "bez 'turbo', napr. large-v3.",
+            param="model",
+        )
     return await _run(
         file, settings, whisper,
         language="auto", prompt=prompt, response_format=response_format,
@@ -93,7 +102,8 @@ async def _run(
     log.info("prepis hotový: file=%s format=%s lang=%s translate=%s trvanie=%.1fs",
              file.filename, response_format.value, language, translate,
              time.perf_counter() - started)
-    return Response(content=result.content, media_type=MEDIA_TYPES[response_format])
+    return Response(content=normalize(result.content, response_format),
+                    media_type=MEDIA_TYPES[response_format])
 
 
 def _valid_language(code: str) -> bool:
