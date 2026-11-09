@@ -54,7 +54,8 @@ def fake_whisper(monkeypatch: pytest.MonkeyPatch) -> FakeWhisper:
 
 def _make_client(**overrides):
     app = create_app()
-    settings = Settings(api_keys=[API_KEY], max_upload_mb=1, _env_file=None, **overrides)
+    overrides.setdefault("max_upload_mb", 1)
+    settings = Settings(api_keys=[API_KEY], _env_file=None, **overrides)
     app.dependency_overrides[get_settings] = lambda: settings
     return TestClient(app)
 
@@ -151,3 +152,29 @@ def test_health(client: TestClient, fake_whisper: FakeWhisper) -> None:
     resp = client.get("/health")
     assert resp.status_code == 503
     assert resp.json()["whisper_backend"] is False
+
+
+def test_docs_disabled_by_default(client: TestClient) -> None:
+    assert client.get("/docs").status_code == 404
+    assert client.get("/openapi.json").status_code == 404
+
+
+def test_short_audio_uses_smaller_window(client: TestClient, fake_whisper: FakeWhisper) -> None:
+    resp = client.post("/v1/audio/transcriptions", files=_audio(), headers=AUTH)
+    assert resp.status_code == 200
+    assert fake_whisper.calls[-1]["audio_ctx"] == 768
+
+
+def test_long_audio_uses_full_window(fake_whisper: FakeWhisper) -> None:
+    # 20 s pri 32 000 B/s
+    with _make_client(max_upload_mb=2) as c:
+        resp = c.post("/v1/audio/transcriptions", files=_audio(20 * 32000 + 44), headers=AUTH)
+    assert resp.status_code == 200
+    assert fake_whisper.calls[-1]["audio_ctx"] == 0
+
+
+def test_short_audio_ctx_disabled(fake_whisper: FakeWhisper) -> None:
+    with _make_client(short_audio_ctx=0) as c:
+        resp = c.post("/v1/audio/transcriptions", files=_audio(), headers=AUTH)
+    assert resp.status_code == 200
+    assert fake_whisper.calls[-1]["audio_ctx"] == 0

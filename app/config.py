@@ -16,8 +16,14 @@ class Settings(BaseSettings):
     request_timeout: float = 1800.0
     ffmpeg_bin: str = "ffmpeg"
     log_level: str = "info"
+    # /docs, /redoc, /openapi.json – na produkcii vypnuté
+    enable_docs: bool = False
     # None = automaticky: vypnuté pre "turbo" modely, ktoré preklad nepodporujú
     translations_enabled: bool | None = None
+    # Zrýchlenie krátkych nahrávok: whisper inak vždy kóduje celé 30 s okno (audio_ctx=1500).
+    # Pri nahrávkach do SHORT_AUDIO_MAX_SECONDS pošleme menšie okno; 768 ≈ 15 s. 0 = vypnuté.
+    short_audio_ctx: int = 768
+    short_audio_max_seconds: float = 14.0
 
     @field_validator("api_keys", mode="before")
     @classmethod

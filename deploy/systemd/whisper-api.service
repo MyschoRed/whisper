@@ -9,14 +9,20 @@ User=whisper
 Group=whisper
 WorkingDirectory=/opt/whisper
 EnvironmentFile=/opt/whisper/.env
-# whisper.cpp spracúva requesty sériovo, viac workerov preto nepomôže
+# Iba localhost – zvonku je dostupné výhradne cez nginx.
+# whisper.cpp spracúva requesty sériovo, viac workerov preto nepomôže.
 ExecStart=/opt/whisper/app/.venv/bin/uvicorn app.main:app \
-    --host 0.0.0.0 \
+    --host 127.0.0.1 \
     --port 8000 \
     --workers 1 \
-    --proxy-headers
+    --proxy-headers \
+    --forwarded-allow-ips 127.0.0.1
 Restart=on-failure
 RestartSec=5
+
+Nice=5
+CPUWeight=50
+MemoryMax=512M
 
 # Hardening
 NoNewPrivileges=true

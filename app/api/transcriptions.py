@@ -13,7 +13,7 @@ from app.auth import require_api_key
 from app.config import Settings, get_settings
 from app.errors import api_error
 from app.schemas import MEDIA_TYPES, ResponseFormat
-from app.services.audio import save_upload, to_wav16k, workdir
+from app.services.audio import save_upload, to_wav16k, wav_duration, workdir
 from app.services.text import normalize
 from app.services.whisper_client import WhisperClient
 
@@ -90,6 +90,8 @@ async def _run(
     with workdir() as tmp:
         src = await save_upload(file, Path(tmp), settings.max_upload_bytes)
         wav = await to_wav16k(src, settings)
+        duration = wav_duration(wav)
+        audio_ctx = _audio_ctx(duration, settings)
         result = await whisper.inference(
             wav,
             response_format=response_format.value,
@@ -97,13 +99,22 @@ async def _run(
             translate=translate,
             prompt=prompt,
             temperature=temperature,
+            audio_ctx=audio_ctx,
         )
 
-    log.info("prepis hotový: file=%s format=%s lang=%s translate=%s trvanie=%.1fs",
-             file.filename, response_format.value, language, translate,
-             time.perf_counter() - started)
+    log.info("prepis hotový: file=%s format=%s lang=%s translate=%s audio=%.1fs "
+             "audio_ctx=%d trvanie=%.1fs",
+             file.filename, response_format.value, language, translate, duration,
+             audio_ctx, time.perf_counter() - started)
     return Response(content=normalize(result.content, response_format),
                     media_type=MEDIA_TYPES[response_format])
+
+
+def _audio_ctx(duration: float, settings: Settings) -> int:
+    """Menšie okno enkódera pre krátke nahrávky (0 = celé 30 s okno)."""
+    if settings.short_audio_ctx > 0 and duration <= settings.short_audio_max_seconds:
+        return settings.short_audio_ctx
+    return 0
 
 
 def _valid_language(code: str) -> bool:

@@ -31,7 +31,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Whisper API", version="0.1.0", lifespan=lifespan)
+    docs = get_settings().enable_docs
+    app = FastAPI(
+        title="Whisper API",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url="/docs" if docs else None,
+        redoc_url="/redoc" if docs else None,
+        openapi_url="/openapi.json" if docs else None,
+    )
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.include_router(health.router)
     app.include_router(models.router)

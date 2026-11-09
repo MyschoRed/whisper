@@ -44,6 +44,7 @@ class WhisperClient:
         translate: bool = False,
         prompt: str | None = None,
         temperature: float = 0.0,
+        audio_ctx: int = 0,
     ) -> InferenceResult:
         data = {
             "response_format": response_format,
@@ -53,6 +54,8 @@ class WhisperClient:
         }
         if prompt:
             data["prompt"] = prompt
+        if audio_ctx > 0:
+            data["audio_ctx"] = str(audio_ctx)
 
         try:
             with wav.open("rb") as fh:

@@ -8,3 +8,4 @@ models/
 whisper.cpp/
 *.egg-info/
 build/
+*.wav

@@ -60,3 +60,13 @@ async def to_wav16k(src: Path, settings: Settings) -> Path:
 def workdir() -> tempfile.TemporaryDirectory[str]:
     """Dočasný priečinok pre jeden request (zmaže sa po spracovaní)."""
     return tempfile.TemporaryDirectory(prefix="whisper-api-")
+
+
+# 16 kHz × 1 kanál × 2 B (pcm_s16le) – formát, ktorý vyrába to_wav16k
+_WAV_BYTES_PER_SECOND = 16000 * 2
+_WAV_HEADER = 44
+
+
+def wav_duration(wav: Path) -> float:
+    """Dĺžka 16 kHz mono PCM WAV v sekundách (podľa veľkosti súboru)."""
+    return max(wav.stat().st_size - _WAV_HEADER, 0) / _WAV_BYTES_PER_SECOND

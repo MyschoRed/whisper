@@ -1,9 +1,9 @@
-from enum import StrEnum
+from enum import Enum
 
 from pydantic import BaseModel
 
 
-class ResponseFormat(StrEnum):
+class ResponseFormat(str, Enum):
     json = "json"
     text = "text"
     srt = "srt"

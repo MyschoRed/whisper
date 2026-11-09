@@ -14,8 +14,8 @@ set -euo pipefail
 PREFIX="${PREFIX:-/opt/whisper}"
 SERVICE_USER="${SERVICE_USER:-whisper}"
 WHISPER_CPP_REPO="${WHISPER_CPP_REPO:-https://github.com/ggml-org/whisper.cpp.git}"
-# Odporúčané: pripnúť na konkrétny release tag, napr. WHISPER_CPP_REF=v1.x.y
-WHISPER_CPP_REF="${WHISPER_CPP_REF:-master}"
+# Pripnutý release tag whisper.cpp (zmena verzie: WHISPER_CPP_REF=v1.x.y)
+WHISPER_CPP_REF="${WHISPER_CPP_REF:-v1.9.5}"
 MODEL="${MODEL:-large-v3-turbo-q5_0}"
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -42,13 +42,13 @@ if [[ ! -d "$PREFIX/whisper.cpp/.git" ]]; then
 fi
 git -C "$PREFIX/whisper.cpp" fetch --tags origin
 git -C "$PREFIX/whisper.cpp" checkout "$WHISPER_CPP_REF"
-git -C "$PREFIX/whisper.cpp" pull --ff-only 2>/dev/null || true
 cmake -S "$PREFIX/whisper.cpp" -B "$PREFIX/whisper.cpp/build" \
     -DCMAKE_BUILD_TYPE=Release \
     -DGGML_NATIVE=ON \
     -DWHISPER_BUILD_EXAMPLES=ON \
     -DWHISPER_BUILD_TESTS=OFF
-cmake --build "$PREFIX/whisper.cpp/build" -j"$(nproc)" --target whisper-server
+# nízka priorita, aby kompilácia nespomalila ostatné aplikácie na serveri
+nice -n 19 cmake --build "$PREFIX/whisper.cpp/build" -j"$(nproc)" --target whisper-server
 test -x "$PREFIX/whisper.cpp/build/bin/whisper-server"
 
 echo "==> Model $MODEL"

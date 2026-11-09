@@ -8,7 +8,7 @@ User=whisper
 Group=whisper
 WorkingDirectory=/opt/whisper
 EnvironmentFile=/opt/whisper/.env
-# Počúva iba na localhoste – von je vystavené len whisper-api
+# Počúva iba na localhoste – von je vystavené len whisper-api cez nginx
 ExecStart=/opt/whisper/whisper.cpp/build/bin/whisper-server \
     --model ${WHISPER_MODEL} \
     --host 127.0.0.1 \
@@ -16,6 +16,14 @@ ExecStart=/opt/whisper/whisper.cpp/build/bin/whisper-server \
     --threads ${WHISPER_THREADS}
 Restart=on-failure
 RestartSec=5
+
+# Server zdieľame s inými aplikáciami: prepis dostane CPU až po nich
+# (CPUWeight 20 vs. predvolených 100) a pamäť je zastropovaná.
+Nice=10
+CPUWeight=20
+IOWeight=20
+MemoryHigh=1700M
+MemoryMax=2G
 
 # Hardening
 NoNewPrivileges=true
